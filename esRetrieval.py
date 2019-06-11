@@ -64,7 +64,7 @@ for index in indices:
 
             scroll = res['_scroll_id']
             res = es.scroll(scroll_id=scroll, scroll='1m')
-        with open(config['elastic_search']['save_path'] \                                   \
+        with open(config['elastic_search']['save_path'] \               
             + config['elastic_search']['search_type']   \
             + '_' + index + '.csv', 'w') as outfile:
 
