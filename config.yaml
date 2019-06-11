@@ -1,8 +1,17 @@
-start_date: (YYYY.mm.dd)
-end_date: (YYYY.mm.dd)
-save_path: (./relative or /absolute)
-search_type: ('byte' or 'dns')
-query: (lucene query accepted by ElasticSearch)
-host_list: 
-  - (localhost)
-  - (otherhost:443)
+elastic_search:
+  start_date: 2018.04.30
+  end_date: 2018.05.02
+  save_path: (/absolute)
+  search_type: ('byte' or 'dns')
+  query: (lucene query accepted by ElasticSearch)
+  host_list: 
+    - (localhost)
+    - (otherhost:443)
+ergm:
+  burnin: 2000000
+  max_iterations: 200
+  sample_size: 10000
+  interval: 4000
+  threshold: 6000
+  threads: 4
+  outfile: 'test.csv'
