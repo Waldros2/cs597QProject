@@ -1,6 +1,6 @@
 import datetime
 import csv
-import sys
+import os
 from collections import defaultdict
 from elasticsearch import Elasticsearch
 import yaml
@@ -8,7 +8,7 @@ import yaml
 #Establish date range
 
 # Read in the YAML file
-YAML_file = open(sys.argv[1])
+YAML_file = open(os.environ['YAML'])
 try:
     config = yaml.safe_load(YAML_file)
 except yaml.YAMLError as exc:
@@ -64,7 +64,10 @@ for index in indices:
 
             scroll = res['_scroll_id']
             res = es.scroll(scroll_id=scroll, scroll='1m')
-        with open(config['elastic_search']['save_path'] + config['elastic_search']['search_type']+ '_' + index + '.csv', 'w') as outfile:
+        with open(config['elastic_search']['save_path'] \                                   \
+            + config['elastic_search']['search_type']   \
+            + '_' + index + '.csv', 'w') as outfile:
+
             writer = csv.writer(outfile)
             writer.writerow(['src', 'dst', 'aggregation'])
             for key, value in connect_dict.items():

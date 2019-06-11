@@ -1,7 +1,7 @@
 elastic_search:
   start_date: 2018.04.30
   end_date: 2018.05.02
-  save_path: (/absolute)
+  save_path: (/absolute/path/)
   search_type: ('byte' or 'dns')
   query: (lucene query accepted by ElasticSearch)
   host_list: 

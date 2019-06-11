@@ -1,15 +1,16 @@
-burnin     <- 20000000   # BURNIN      = 20000000
-maxit      <- 1000       # MAXIT       = 1000
-samplesize <- 10000      # SAMPLESIZE  = 10000
-interval   <- 3000       # INTERVAL    = 3000
-##############################################
-# OPTIONS FOR VALUES
+require('statnet')
+require('yaml')
 
+yaml_file = Sys.getenv("YAML")
+yaml_data = yaml.load_file(yaml_file)
+outfile <- paste0(yaml_data$elastic_search$save_path, yaml_data$ergm$outfile)
+
+##############################################
+# ESTABLISH DATA FRAME
+##############################################
 values     <- data.frame(date = as.Date(character())
                      , sum = numeric()
-                     , nonzero = numeric()
-                     , atLeastMedian = numeric()
-                     , atLeastMean = numeric()
+                     , atleast = numeric()
                      , stringsAsFactors = FALSE)
 
 ##############################################
@@ -17,35 +18,33 @@ values     <- data.frame(date = as.Date(character())
 ##############################################
 runErgm <- function(){
   
-  currErgmModel <- ergm(networkDay~sum + edges + atleast(threshold = median) + atleast(threshold = mean)
-                    , response = 'MB'
+  currErgmModel <- ergm(networkDay~sum + atleast(threshold = yaml_data$ergm$threshold)
+                    , response = 'aggregation'
                     , reference = ~Geometric
                     , control = control.ergm(
-                         MCMLE.maxit = maxit
-                       , MCMLE.density.guard = exp(4)
-											 , MCMC.interval = interval
-											 , MCMC.burnin = burnin
-											 , MCMC.samplesize = samplesize
-											 , parallel = 4)
+                         MCMLE.maxit = yaml_data$ergm$max_iterations
+											 , MCMC.interval = yaml_data$ergm$interval
+											 , MCMC.burnin = yaml_data$ergm$burnin
+											 , MCMC.samplesize = yaml_data$ergm$sample_size
+											 , parallel = yaml_data$ergm$threads)
 					          , eval.loglik = FALSE)
   return (currErgmModel)
 }
 ##############################################
 # MODEL WORK
 ##############################################
-baseline <- '/home/scott/Documents/networkresearch/data/dns/baseline.csv'
-baseline <- read.csv(file = baseline, header = TRUE, row.names = 1)
 
-date <- as.Date('2018.04.17', format='%Y.%m.%d')
-endDate <- as.Date('2018.05.12', format='%Y.%m.%d')
+date <- as.Date(yaml_data$elastic_search$start_date, format='%Y.%m.%d')
+endDate <- as.Date(yaml_data$elastic_search$end_date, format='%Y.%m.%d')
 while (date <= endDate)
 {
   	ergmModel <- NULL
   	edgeList  <- NULL
-    dayOfWeek <- weekdays(date)
-    
-  	edgeListFile <- paste0('/home/scott/Documents/networkresearch/data/dns/logstash-'
-							 , format(date, "%Y.%m.%d.csv"))
+  	
+  	edgeListFile <- paste0(yaml_data$elastic_search$save_path
+	  						, yaml_data$elastic_search$search_type
+	  						, '_logstash-'
+							  , format(date, "%Y.%m.%d.csv"))
   	
 	try(edgeList <- read.csv(file = edgeListFile
 							 , header = TRUE))
@@ -56,42 +55,29 @@ while (date <= endDate)
 								, matrix.type = 'edgelist'
 								, directed = TRUE
 								, ignore.eval = FALSE
-								, names.eval = 'MB')
-
-  		median 	<- median(networkDay %e% 'MB')
-  		mean 		<- mean(networkDay %e% 'MB')
+								, names.eval = 'aggregation')
   		
   		# Rerun the ERGM model until it converges
-		  attempt 	<- 0
-  		while(is.null(ergmModel) && attempt < 5)
-		  {
-			  try(ergmModel <- runErgm())
-    		  attempt <- attempt + 1
-  		}
+		try(ergmModel <- runErgm())
 		  
 		  # Parse ERGM model data to write to CSV
   		if(!is.null(ergmModel))
 		  {
     		currValue <- data.frame(Date=as.character(date)
-									, Sum = ergmModel$coef[1]
-									, edges = ergmModel$coef[2]
-									, atLeastMedian = ergmModel$coef[3]
-									, atLeastMean = ergmModel$coef[4])
+									, sum = ergmModel$coef[1]
+									, atleast = ergmModel$coef[2])
     		
 			  values <- rbind(values, currValue) 
-  		  write.csv(values, file = '/home/waldros2/CSCI-WWU/networkresearch/data/values2.csv')
-  		  
-  		  # Update baseline values
-  		  baseline[dayOfWeek, 'Median'] <- median(networkDay %e% 'Connections')
-  		  baseline[dayOfWeek, 'Mean'] <- mean(networkDay %e% 'Connections')
+  		  write.csv(values, file = outfile)
   		}
+		  else
+		  {
+		    print(paste0("Could not calculate ERGM terms for ", date))
+		  }
 	}
+  else
+  {
+    print(paste0("Could not find edgelist for ", date))
+  }
   date <- date + 1
 }
-
-################################################
-# Extra
-################################################
-
-mbFile <- read.csv(file = '/home/scott/Documents/networkresearch/data/byte/byte_logstash-2018.04.30.csv', header = TRUE)
-
