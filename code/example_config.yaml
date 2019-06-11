@@ -1,8 +1,0 @@
-start_date: (YYYY.mm.dd)
-end_date: (YYYY.mm.dd)
-save_path: (./relative or /absolute)
-search_type: ('byte' or 'dns')
-query: (lucene query accepted by ElasticSearch)
-host_list: 
-  - (localhost)
-  - (otherhost:443)
