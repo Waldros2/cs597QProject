@@ -15,3 +15,13 @@ ergm:
   threshold: 6000
   threads: 4
   outfile: 'test.csv'
+arma:
+    data: (/absolute/path/)
+    plot: 'fit'
+    train_max_p: 7
+    train_max_q: 7
+    threshold_denom: 1.0
+    num_pred_days: 7
+    stationarity_report: True
+    model_p: 7
+    model_q: 1
