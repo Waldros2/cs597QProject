@@ -1,4 +1,4 @@
-# ARMA.py 
+# ARMA.py
 # June 2019
 
 # Multifunctional script to train and predict
@@ -17,6 +17,7 @@ from pandas import DataFrame
 from statsmodels.tsa.arima_model import ARIMA
 from statsmodels.tsa.stattools import adfuller
 from pmdarima.arima import auto_arima
+from sklearn.metrics import mean_squared_error
 plt.style.use('grayscale')
 
 # Load YAML file from environment
@@ -27,33 +28,33 @@ except yaml.YAMLError as exc:
     print(exc)
 
 # Optional stationarity evaluation
-# using Augmented Dickey-Fuller 
+# using Augmented Dickey-Fuller
 # unit root tests.
 def stationarity_report(df):
-    
+
     # Raw data
     print(">> Raw data stationary:")
     dftest = adfuller(df.atLeastMean, autolag='AIC')
     print("Test statistic = {:.3f}".format(dftest[0]))
     print("P-value = {:.3f}".format(dftest[1]))
     print("Critical values :")
-    
+
     for k, v in dftest[4].items():
         print("\t{}: {} - The data is {} stationary with {}% confidence.".format(k, v, "not" if v<dftest[0] else "", 100-int(k[:-1])))
     print()
-    
+
     # De-trended data
     print(">> De-trended data stationary:")
     dftest = adfuller(df.z_data.dropna(), autolag='AIC')
     print("Test statistic = {:.3f}".format(dftest[0]))
     print("P-value = {:.3f}".format(dftest[1]))
     print("Critical values :")
-    
+
     for k, v in dftest[4].items():
         print("\t{}: {} - The data is {} stationary with {}% confidence.".format(k, v, "not" if v<dftest[0] else "", 100-int(k[:-1])))
     print()
 
-# Get lowest AIC ARMA model using grid 
+# Get lowest AIC ARMA model using grid
 # search hyperparameter selection.
 # Paramter limits chosen from YAML file.
 def get_model(data):
@@ -61,31 +62,31 @@ def get_model(data):
                            max_p=config['arma']['train_max_p'], max_q=config['arma']['train_max_q'],
                            seasonal=False,
                            trace=True,
-                           error_action='ignore',  
+                           error_action='ignore',
                            suppress_warnings=True,
                            stepwise=False)
-    
+
     return model
 
 def train():
-    
+
     print(">> Loading data . . .")
 
     # Raw Data
     data = pd.read_csv(config['arma']['data'], index_col=0, usecols=['date', 'atLeastMean'], parse_dates=['date'])
-    
+
     # De-trend data using z-score differencing
     # over a 7 day window
     data['z_data'] = (data['atLeastMean'] - data.atLeastMean.rolling(window=7).mean()) / data.atLeastMean.rolling(window=7).std()
-    
+
     # Perform optional report
     if config['arma']['stationarity_report']:
         print(">> Stationarity report . . .")
         stationarity_report(data)
-    
+
     # Grab number of days and use that
     # to determine and build train
-    # and test sets 
+    # and test sets
     days = config['arma']['num_pred_days']
     X = 0 - days
     train, test = data.z_data.dropna()[:X], data.z_data.dropna()[X:]
@@ -93,14 +94,27 @@ def train():
     # Calculate threshold
     std = train.std(axis=0, skipna=True)
     threshold = std / (config['arma']['threshold_denom'])
-    
+
     # Train ARMA model and report metrics
     print(">> Training model . . .")
     model = get_model(train.values)
     print(">> ARMA model AIC: [{}]".format(model.aic()))
     preds = model.predict(test.shape[0])
     print(">> RMSE: [%.3f]" % np.sqrt(mean_squared_error(test, preds)))
-    
+
+    # get param values
+    print(model.get_params())
+    params = model.get_params()
+    order = params["order"]
+    model_p = order[0]
+    model_q = order[2]
+
+    # Update the yaml file with model Parameters
+    config["arma"]["model_p"] = model_p
+    config["arma"]["model_q"] = model_q
+    with open(os.environ['YAML'], "w") as f:
+        yaml.dump(config, f)
+
     # Plot the data
     # Save off as desired
     fig, ax = plt.subplots(figsize=(14, 8))
@@ -118,7 +132,7 @@ def train():
 def main():
 
     print("ARMA Time")
-    
+
     flag = sys.argv[1]
 
     if flag == 't':
